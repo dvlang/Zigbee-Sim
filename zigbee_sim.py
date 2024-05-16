@@ -1,6 +1,5 @@
-#Run_8
-#added timestamp
-
+#run_9
+#added a 0.0048s timer to mimic the time to send a full frame
 import random
 import string
 import time
@@ -26,6 +25,7 @@ class Node:
     def send_frame(self, frame, nodes):
         frame.timestamp = time.time()
         print(f"Node {self.node_id} sending frame at time {frame.timestamp}: {frame}")
+        time.sleep(0.0048)  # Introduce a delay to simulate frame transmission time
         for node in nodes:
             if node.node_number == frame.dst_node:
                 node.receive_frame(frame)
@@ -81,4 +81,3 @@ if __name__ == "__main__":
     num_nodes = int(input("Enter the number of nodes: "))
     num_frames = int(input("Enter the number of frames: "))
     simulate_zigbee_network(num_nodes, num_frames)
-
