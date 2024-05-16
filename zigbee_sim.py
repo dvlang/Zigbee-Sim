@@ -1,5 +1,5 @@
-#run_9
-#added a 0.0048s timer to mimic the time to send a full frame
+#run_10
+#if a node receives a message that is not for its address, print "not for me" and resend that message. if a node receives a message for it's address print "message is for me". 
 import random
 import string
 import time
@@ -34,19 +34,24 @@ class Node:
     def receive_frame(self, frame):
         frame.timestamp = time.time()
         print(f"Node {self.node_id} received frame at time {frame.timestamp}: {frame}")
-
+        if frame.dst_node != self.node_number:
+            print("Not for me")
+            # Resend the message
+            frame.src_node, frame.dst_node = frame.dst_node, frame.src_node  # Swap source and destination nodes
+            self.send_frame(frame, [])
+        else:
+            print("Message is for me")
 
 def generate_random_payload():
     alphanumeric_chars = string.ascii_letters + string.digits
     return ''.join(random.choice(alphanumeric_chars) for _ in range(104)).encode('utf-8')  # Generate a random alphanumeric string of length 104 bytes
-
 
 def simulate_zigbee_network(num_nodes, num_frames):
     nodes = [Node(i) for i in range(num_nodes)]
 
     for _ in range(num_frames):
         transmitting_node = random.choice(nodes)
-        destination_node = random.choice([node for node in nodes if node.node_id != transmitting_node.node_id])  # Ensure destination is not the transmitting node
+        destination_node = random.choice(nodes)  # Allow frames to be sent to any node
 
         payload = generate_random_payload()
 
