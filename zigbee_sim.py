@@ -1,15 +1,19 @@
+#Run_8
+#added timestamp
+
 import random
 import string
 import time
 
 class ZigbeeFrame:
-    def __init__(self, src_node, dst_node, payload):
+    def __init__(self, src_node, dst_node, payload, timestamp=None):
         self.src_node = src_node
         self.dst_node = dst_node
         self.payload = payload
+        self.timestamp = timestamp if timestamp is not None else time.time()
 
     def __str__(self):
-        return f"ZigbeeFrame(src_node={self.src_node}, dst_node={self.dst_node}, payload={self.payload})"
+        return f"ZigbeeFrame(src_node={self.src_node}, dst_node={self.dst_node}, payload={self.payload}, timestamp={self.timestamp})"
 
 
 class Node:
@@ -20,14 +24,16 @@ class Node:
         self.collision = False
     
     def send_frame(self, frame, nodes):
-        print(f"Node {self.node_id} sending frame: {frame}")
+        frame.timestamp = time.time()
+        print(f"Node {self.node_id} sending frame at time {frame.timestamp}: {frame}")
         for node in nodes:
             if node.node_number == frame.dst_node:
                 node.receive_frame(frame)
                 break
 
     def receive_frame(self, frame):
-        print(f"Node {self.node_id} received frame: {frame}")
+        frame.timestamp = time.time()
+        print(f"Node {self.node_id} received frame at time {frame.timestamp}: {frame}")
 
 
 def generate_random_payload():
