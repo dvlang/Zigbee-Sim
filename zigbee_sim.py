@@ -1,8 +1,12 @@
-#run_10
-#if a node receives a message that is not for its address, print "not for me" and resend that message. if a node receives a message for it's address print "message is for me". 
+#run_12
+#change the backoff time to be compliant to 802.15.4 zigbee  CSMA-CA standard
 import random
 import string
 import time
+
+# Constants defined by the 802.15.4 Zigbee CSMA-CA standard
+SYMBOL_DURATION = 16 * (10 ** -6)  # Duration of one symbol (in seconds)
+SLOT_DURATION = 20 * SYMBOL_DURATION  # Duration of one slot (in seconds)
 
 class ZigbeeFrame:
     def __init__(self, src_node, dst_node, payload, timestamp=None):
@@ -58,8 +62,11 @@ def simulate_zigbee_network(num_nodes, num_frames):
         frame = ZigbeeFrame(transmitting_node.node_number, destination_node.node_number, payload)
 
         if transmitting_node.collision:
-            print(f"Collision occurred at Node {transmitting_node.node_id}")
+            print(f"txCollision occurred at Node {transmitting_node.node_id}")
             transmitting_node.backoff = random.randint(0, 2 ** transmitting_node.backoff - 1)
+            backoff_symbols = min(transmitting_node.backoff, 5)  # Ensure backoff does not exceed maximum allowed value (5 symbols)
+            backoff_time = backoff_symbols * SLOT_DURATION
+            print(f"txNode {transmitting_node.node_id} starts the backoff process for {backoff_symbols} symbols ({backoff_time} seconds).")
             transmitting_node.collision = False
         else:
             transmitting_node.send_frame(frame, nodes)
@@ -69,7 +76,7 @@ def simulate_zigbee_network(num_nodes, num_frames):
                 if random.random() < 0.5:  # Probability of sensing the channel busy
                     print(f"Node {node.node_id} sensed the channel busy.")
                     if node.backoff == 0:
-                        print(f"Node {node.node_id} starts the backoff process.")
+                        print(f"Node {node.node_id} starts the backoff process for {node.backoff} symbols ({node.backoff * SLOT_DURATION} seconds).")
                     while node.backoff > 0:
                         print(f"Node {node.node_id} backoff: {node.backoff}")
                         time.sleep(0.5)  # Simulate time for backoff
@@ -78,6 +85,9 @@ def simulate_zigbee_network(num_nodes, num_frames):
                             print(f"Collision occurred at Node {node.node_id}")
                             node.collision = True
                             node.backoff = min(node.backoff + 1, 5)  # Binary exponential backoff
+                            backoff_symbols = min(node.backoff, 5)  # Ensure backoff does not exceed maximum allowed value (5 symbols)
+                            backoff_time = backoff_symbols * SLOT_DURATION
+                            print(f"Node {node.node_id} starts the backoff process for {backoff_symbols} symbols ({backoff_time} seconds).")
                             break
                     else:
                         node.backoff = 0
