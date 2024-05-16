@@ -1,5 +1,5 @@
-#run_12
-#change the backoff time to be compliant to 802.15.4 zigbee  CSMA-CA standard
+#run_13
+#User allow other nodes to attempt to send if one node is transmitting. 
 import random
 import string
 import time
@@ -54,43 +54,42 @@ def simulate_zigbee_network(num_nodes, num_frames):
     nodes = [Node(i) for i in range(num_nodes)]
 
     for _ in range(num_frames):
-        transmitting_node = random.choice(nodes)
-        destination_node = random.choice(nodes)  # Allow frames to be sent to any node
+        # Simulate channel sensing
+        channel_busy = any(node.backoff > 0 for node in nodes)
 
-        payload = generate_random_payload()
+        if not channel_busy:
+            transmitting_node = random.choice(nodes)
+            destination_node = random.choice(nodes)  # Allow frames to be sent to any node
 
-        frame = ZigbeeFrame(transmitting_node.node_number, destination_node.node_number, payload)
+            payload = generate_random_payload()
 
-        if transmitting_node.collision:
-            print(f"txCollision occurred at Node {transmitting_node.node_id}")
-            transmitting_node.backoff = random.randint(0, 2 ** transmitting_node.backoff - 1)
-            backoff_symbols = min(transmitting_node.backoff, 5)  # Ensure backoff does not exceed maximum allowed value (5 symbols)
-            backoff_time = backoff_symbols * SLOT_DURATION
-            print(f"txNode {transmitting_node.node_id} starts the backoff process for {backoff_symbols} symbols ({backoff_time} seconds).")
-            transmitting_node.collision = False
-        else:
-            transmitting_node.send_frame(frame, nodes)
+            frame = ZigbeeFrame(transmitting_node.node_number, destination_node.node_number, payload)
+
+            if transmitting_node.collision:
+                print(f"Collision occurred at Node {transmitting_node.node_id}")
+                transmitting_node.backoff = random.randint(0, 2 ** transmitting_node.backoff - 1)
+                backoff_symbols = min(transmitting_node.backoff, 5)  # Ensure backoff does not exceed maximum allowed value (5 symbols)
+                backoff_time = backoff_symbols * SLOT_DURATION
+                print(f"Node {transmitting_node.node_id} starts the backoff process for {backoff_symbols} symbols ({backoff_time} seconds).")
+                transmitting_node.collision = False
+            else:
+                transmitting_node.send_frame(frame, nodes)
 
         for node in nodes:
             if node != transmitting_node:
-                if random.random() < 0.5:  # Probability of sensing the channel busy
-                    print(f"Node {node.node_id} sensed the channel busy.")
-                    if node.backoff == 0:
-                        print(f"Node {node.node_id} starts the backoff process for {node.backoff} symbols ({node.backoff * SLOT_DURATION} seconds).")
-                    while node.backoff > 0:
-                        print(f"Node {node.node_id} backoff: {node.backoff}")
-                        time.sleep(0.5)  # Simulate time for backoff
-                        node.backoff -= 1
-                        if random.random() < 0.5:  # Probability of collision
-                            print(f"Collision occurred at Node {node.node_id}")
-                            node.collision = True
-                            node.backoff = min(node.backoff + 1, 5)  # Binary exponential backoff
-                            backoff_symbols = min(node.backoff, 5)  # Ensure backoff does not exceed maximum allowed value (5 symbols)
-                            backoff_time = backoff_symbols * SLOT_DURATION
-                            print(f"Node {node.node_id} starts the backoff process for {backoff_symbols} symbols ({backoff_time} seconds).")
-                            break
-                    else:
-                        node.backoff = 0
+                if node.backoff == 0:
+                    print(f"Node {node.node_id} starts the backoff process for {node.backoff} symbols ({node.backoff * SLOT_DURATION} seconds).")
+                while node.backoff > 0:
+                    print(f"Node {node.node_id} backoff: {node.backoff}")
+                    time.sleep(SLOT_DURATION)  # Simulate time for backoff
+                    node.backoff -= 1
+
+                    # After backoff, check if channel is still busy
+                    channel_busy = any(other_node.backoff > 0 for other_node in nodes if other_node != node)
+                    if channel_busy:
+                        break
+
+        time.sleep(0.0048)  # Introduce a delay to simulate frame transmission time
 
 if __name__ == "__main__":
     num_nodes = int(input("Enter the number of nodes: "))
