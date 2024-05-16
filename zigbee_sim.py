@@ -1,43 +1,78 @@
 import random
+import string
+import time
+
+class ZigbeeFrame:
+    def __init__(self, src_node, dst_node, payload):
+        self.src_node = src_node
+        self.dst_node = dst_node
+        self.payload = payload
+
+    def __str__(self):
+        return f"ZigbeeFrame(src_node={self.src_node}, dst_node={self.dst_node}, payload={self.payload})"
+
 
 class Node:
     def __init__(self, node_id):
         self.node_id = node_id
+        self.node_number = node_id
         self.backoff = 0
+        self.collision = False
     
-    def send_frame(self, frame):
+    def send_frame(self, frame, nodes):
         print(f"Node {self.node_id} sending frame: {frame}")
-        return frame
+        for node in nodes:
+            if node.node_number == frame.dst_node:
+                node.receive_frame(frame)
+                break
 
     def receive_frame(self, frame):
         print(f"Node {self.node_id} received frame: {frame}")
 
+
+def generate_random_payload():
+    alphanumeric_chars = string.ascii_letters + string.digits
+    return ''.join(random.choice(alphanumeric_chars) for _ in range(104)).encode('utf-8')  # Generate a random alphanumeric string of length 104 bytes
+
+
 def simulate_zigbee_network(num_nodes, num_frames):
     nodes = [Node(i) for i in range(num_nodes)]
-    frames = [f"Frame {i}" for i in range(num_frames)]
 
-    for frame in frames:
+    for _ in range(num_frames):
         transmitting_node = random.choice(nodes)
-        transmitted_frame = transmitting_node.send_frame(frame)
+        destination_node = random.choice([node for node in nodes if node.node_id != transmitting_node.node_id])  # Ensure destination is not the transmitting node
+
+        payload = generate_random_payload()
+
+        frame = ZigbeeFrame(transmitting_node.node_number, destination_node.node_number, payload)
+
+        if transmitting_node.collision:
+            print(f"Collision occurred at Node {transmitting_node.node_id}")
+            transmitting_node.backoff = random.randint(0, 2 ** transmitting_node.backoff - 1)
+            transmitting_node.collision = False
+        else:
+            transmitting_node.send_frame(frame, nodes)
 
         for node in nodes:
             if node != transmitting_node:
-                if random.random() < 0.5:  # Probability of sensing the channel
+                if random.random() < 0.5:  # Probability of sensing the channel busy
                     print(f"Node {node.node_id} sensed the channel busy.")
                     if node.backoff == 0:
                         print(f"Node {node.node_id} starts the backoff process.")
                     while node.backoff > 0:
                         print(f"Node {node.node_id} backoff: {node.backoff}")
+                        time.sleep(0.5)  # Simulate time for backoff
                         node.backoff -= 1
                         if random.random() < 0.5:  # Probability of collision
                             print(f"Collision occurred at Node {node.node_id}")
-                            node.backoff = min(node.backoff + 1, 7)  # Binary exponential backoff
+                            node.collision = True
+                            node.backoff = min(node.backoff + 1, 5)  # Binary exponential backoff
                             break
                     else:
-                        node.receive_frame(transmitted_frame)
                         node.backoff = 0
 
 if __name__ == "__main__":
     num_nodes = int(input("Enter the number of nodes: "))
     num_frames = int(input("Enter the number of frames: "))
     simulate_zigbee_network(num_nodes, num_frames)
+
