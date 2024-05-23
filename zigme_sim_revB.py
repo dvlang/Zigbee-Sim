@@ -6,6 +6,7 @@
 #
 #0.1:  add a print when a node sends a frame
 #0.2: update to use zigbee frame format
+#0.3: when a node must backoff ensure that it re-attempts transmission
 
 #################################################################################################################################################
 
@@ -14,16 +15,30 @@ import random
 import time
 
 #Represents each node in the network with added functionalities.
+import random
+import time
+
 class Node:
     def __init__(self, node_id, network):
         self.node_id = node_id
         self.network = network
         self.received_frames = []
 
-    def send_frame(self, dest_id, frame_id, payload):
-        print(f"Node {self.node_id} is attempting to send frame {frame_id} to Node {dest_id}")
+    def send_frame(self, dest_id, frame_id, payload, attempt=0):
+        print(f"Node {self.node_id} is attempting to send frame {frame_id} to Node {dest_id} (Attempt {attempt + 1})")
         frame = ZigbeeFrame(self.node_id, dest_id, frame_id, payload)
-        self.network.send_frame(frame)
+        success = self.network.send_frame(frame)
+        if not success:
+            self.retry_frame(dest_id, frame_id, payload, attempt + 1)
+
+    def retry_frame(self, dest_id, frame_id, payload, attempt):
+        if attempt < self.network.max_retries:
+            backoff_time = self.network.calculate_backoff(attempt)
+            print(f"Node {self.node_id} backing off for {backoff_time:.3f} seconds (Attempt {attempt + 1})")
+            time.sleep(backoff_time)
+            self.send_frame(dest_id, frame_id, payload, attempt)
+        else:
+            print(f"Node {self.node_id} failed to send frame {frame_id} to Node {dest_id} after {attempt} attempts")
 
     def receive_frame(self, frame):
         self.received_frames.append(frame)
@@ -32,10 +47,6 @@ class Node:
         if frame.dest_id != self.node_id:
             self.network.send_frame(frame)
 
-    def check_channel(self):
-        return self.network.is_channel_free()
-
-#Represents a Zigbee frame with essential fields.
 class ZigbeeFrame:
     def __init__(self, source_id, dest_id, frame_id, payload):
         self.frame_type = 'data'  # Simplified for this simulation
@@ -44,18 +55,20 @@ class ZigbeeFrame:
         self.frame_id = frame_id
         self.payload = payload
 
+
 #Manages nodes and frames, handles collisions, and forwards frames.
 class Network:
-    def __init__(self, num_nodes):
+    def __init__(self, num_nodes, max_retries=5):
         self.nodes = [Node(i, self) for i in range(num_nodes)]
         self.channel_busy = False
         self.collisions = 0
+        self.max_retries = max_retries
 
     def send_frame(self, frame):
         if not self.is_channel_free():
             self.collisions += 1
             print(f"Collision occurred while sending frame {frame.frame_id} from Node {frame.source_id}")
-            self.handle_collision()
+            return False
         else:
             self.channel_busy = True
             print(f"Frame {frame.frame_id} sent from Node {frame.source_id} to Node {frame.dest_id} with payload: {frame.payload}")
@@ -63,14 +76,15 @@ class Network:
                 if node.node_id != frame.source_id:
                     node.receive_frame(frame)
             self.channel_busy = False
+            return True
 
     def is_channel_free(self):
         return not self.channel_busy
 
-    def handle_collision(self):
-        backoff_time = random.uniform(0.001, 0.01)
-        print(f"Backoff for {backoff_time:.3f} seconds due to collision")
-        time.sleep(backoff_time)
+    def calculate_backoff(self, attempt):
+        # Binary exponential backoff: 2^attempt * base_time
+        base_time = 0.01
+        return random.uniform(0, (2 ** attempt) * base_time)
 
     def start_simulation(self, num_frames):
         for _ in range(num_frames):
