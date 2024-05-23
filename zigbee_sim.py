@@ -1,5 +1,5 @@
-#run_18
-#add a print to indicate medium is busy 
+#run_19
+#randomize start time of nodes
 import random
 import string
 import time
@@ -76,9 +76,14 @@ class Node:
                     frames_sent += 1
 
     def send_frame(self):
+        # Random initial delay before the node starts to attempt sending frames
+        initial_delay = random.uniform(0.1, 2.0)  # Random delay between 0.1 and 2.0 seconds
+        print(f"Node {self.node_id} will start sending after an initial delay of {initial_delay} seconds.")
+        time.sleep(initial_delay)
+
         while self.frames_to_send > 0:
             # Randomly decide if the node will attempt to transmit
-            time.sleep(random.uniform(0.1, 1.0))  # Random delay before attempting to send
+          #  time.sleep(random.uniform(0.1, 0.1))  # Random delay before attempting to send
             self.attempt_to_send_frame()
 
     def receive_frame(self, frame, nodes):
