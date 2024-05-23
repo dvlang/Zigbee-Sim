@@ -1,5 +1,5 @@
-#run_15
-#update program so that multiple nodes randomly attempt to transmit at same time
+#run_16
+#update program so to not ignore number of frames specified by user
 import random
 import string
 import time
@@ -12,6 +12,7 @@ FRAME_TRANSMISSION_TIME = 0.0048  # Time to transmit a frame (in seconds)
 BACKOFF_EXPONENT = 5  # Maximum value of the backoff exponent
 
 lock = Lock()  # A lock to manage concurrent access to the medium
+frame_count_lock = Lock()  # A lock to manage access to the frame counter
 
 class ZigbeeFrame:
     def __init__(self, src_node, dst_node, payload, timestamp=None):
@@ -24,19 +25,22 @@ class ZigbeeFrame:
         return f"ZigbeeFrame(src_node={self.src_node}, dst_node={self.dst_node}, payload={self.payload}, timestamp={self.timestamp})"
 
 class Node:
-    def __init__(self, node_id, nodes):
+    def __init__(self, node_id, nodes, total_frames):
         self.node_id = node_id
         self.node_number = node_id
         self.backoff = 0
         self.collision = False
         self.nodes = nodes
+        self.frames_to_send = total_frames
 
     def generate_random_payload(self):
         alphanumeric_chars = string.ascii_letters + string.digits
         return ''.join(random.choice(alphanumeric_chars) for _ in range(104)).encode('utf-8')  # Generate a random alphanumeric string of length 104 bytes
 
     def send_frame(self):
-        while True:
+        global frames_sent
+
+        while self.frames_to_send > 0:
             # Randomly decide if the node will attempt to transmit
             time.sleep(random.uniform(0.1, 1.0))  # Random delay before attempting to send
 
@@ -69,6 +73,9 @@ class Node:
                     self.backoff += 1
                 else:
                     self.backoff = 0
+                    self.frames_to_send -= 1
+                    with frame_count_lock:
+                        frames_sent += 1
 
     def receive_frame(self, frame, nodes):
         frame.timestamp = time.time()
@@ -78,7 +85,10 @@ class Node:
             self.send_frame()
 
 def simulate_zigbee_network(num_nodes, num_frames):
-    nodes = [Node(i, None) for i in range(num_nodes)]
+    global frames_sent
+    frames_sent = 0
+
+    nodes = [Node(i, None, num_frames) for i in range(num_nodes)]
     for node in nodes:
         node.nodes = nodes  # Assign the list of nodes to each node
 
@@ -93,5 +103,5 @@ def simulate_zigbee_network(num_nodes, num_frames):
 
 if __name__ == "__main__":
     num_nodes = int(input("Enter the number of nodes: "))
-    num_frames = int(input("Enter the number of frames: "))  # This parameter is no longer needed but kept for compatibility
+    num_frames = int(input("Enter the total number of frames: "))
     simulate_zigbee_network(num_nodes, num_frames)
