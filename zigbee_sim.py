@@ -1,5 +1,5 @@
-#run_13
-#User allow other nodes to attempt to send if one node is transmitting. 
+#run_14
+#update such that if a message received by a node is not addressed to it, it is forwarded
 import random
 import string
 import time
@@ -32,17 +32,16 @@ class Node:
         time.sleep(0.0048)  # Introduce a delay to simulate frame transmission time
         for node in nodes:
             if node.node_number == frame.dst_node:
-                node.receive_frame(frame)
+                node.receive_frame(frame, nodes)
                 break
 
-    def receive_frame(self, frame):
+    def receive_frame(self, frame, nodes):
         frame.timestamp = time.time()
         print(f"Node {self.node_id} received frame at time {frame.timestamp}: {frame}")
         if frame.dst_node != self.node_number:
-            print("Not for me")
-            # Resend the message
-            frame.src_node, frame.dst_node = frame.dst_node, frame.src_node  # Swap source and destination nodes
-            self.send_frame(frame, [])
+            print("Not for me, forwarding the message")
+            # Forward the message
+            self.send_frame(frame, nodes)
         else:
             print("Message is for me")
 
