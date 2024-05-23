@@ -1,5 +1,5 @@
-#run_16
-#update program so to not ignore number of frames specified by user
+#run_17
+#update so that while in the simulated frame transmission time, another node can attempt to transmit
 import random
 import string
 import time
@@ -13,6 +13,10 @@ BACKOFF_EXPONENT = 5  # Maximum value of the backoff exponent
 
 lock = Lock()  # A lock to manage concurrent access to the medium
 frame_count_lock = Lock()  # A lock to manage access to the frame counter
+medium_state_lock = Lock()  # A lock to manage the state of the medium
+
+medium_busy = False
+frames_sent = 0
 
 class ZigbeeFrame:
     def __init__(self, src_node, dst_node, payload, timestamp=None):
@@ -25,20 +29,20 @@ class ZigbeeFrame:
         return f"ZigbeeFrame(src_node={self.src_node}, dst_node={self.dst_node}, payload={self.payload}, timestamp={self.timestamp})"
 
 class Node:
-    def __init__(self, node_id, nodes, total_frames):
+    def __init__(self, node_id, nodes, frames_to_send):
         self.node_id = node_id
         self.node_number = node_id
         self.backoff = 0
         self.collision = False
         self.nodes = nodes
-        self.frames_to_send = total_frames
+        self.frames_to_send = frames_to_send
 
     def generate_random_payload(self):
         alphanumeric_chars = string.ascii_letters + string.digits
         return ''.join(random.choice(alphanumeric_chars) for _ in range(104)).encode('utf-8')  # Generate a random alphanumeric string of length 104 bytes
 
     def send_frame(self):
-        global frames_sent
+        global frames_sent, medium_busy
 
         while self.frames_to_send > 0:
             # Randomly decide if the node will attempt to transmit
@@ -53,14 +57,15 @@ class Node:
 
             attempt_success = False
             while not attempt_success:
-                with lock:
-                    # Simulate channel sensing
-                    if any(node.collision for node in self.nodes):
+                with medium_state_lock:
+                    if medium_busy:
                         self.collision = True
                     else:
+                        medium_busy = True
                         print(f"Node {self.node_id} sending frame at time {time.time()}: {frame}")
                         time.sleep(FRAME_TRANSMISSION_TIME)  # Simulate frame transmission time
-                        destination_node.receive_frame(frame, self.nodes)
+                        medium_busy = False
+                        destination_node.receive_frame(frame)
                         self.collision = False
                         attempt_success = True
 
@@ -77,7 +82,7 @@ class Node:
                     with frame_count_lock:
                         frames_sent += 1
 
-    def receive_frame(self, frame, nodes):
+    def receive_frame(self, frame):
         frame.timestamp = time.time()
         print(f"Node {self.node_id} received frame at time {frame.timestamp}: {frame}")
         if frame.dst_node != self.node_number:
@@ -88,7 +93,7 @@ def simulate_zigbee_network(num_nodes, num_frames):
     global frames_sent
     frames_sent = 0
 
-    nodes = [Node(i, None, num_frames) for i in range(num_nodes)]
+    nodes = [Node(i, None, num_frames // num_nodes) for i in range(num_nodes)]
     for node in nodes:
         node.nodes = nodes  # Assign the list of nodes to each node
 
